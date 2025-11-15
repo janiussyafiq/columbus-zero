@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "itinerary-functions"
+version = "1.0.0"
+description = "Itinerary management Lambda functions"
+authors = ["Columbus Zero Team"]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+boto3 = "^1.34.0"
+psycopg2-binary = "^2.9.9"
+anthropic = "^0.18.0"
+pydantic = "^2.5.0"
+
+[tool.poetry.dev-dependencies]
+pytest = "^7.4.0"
+black = "^23.12.0"
+flake8 = "^7.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

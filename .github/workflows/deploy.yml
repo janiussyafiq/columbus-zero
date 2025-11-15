@@ -1,0 +1,275 @@
+name: Deploy Columbus Zero
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+      - develop
+  pull_request:
+    branches:
+      - main
+      - staging
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm install
+          cd infrastructure && npm install && cd ..
+          cd frontend && npm install && cd ..
+
+      - name: Lint frontend
+        run: cd frontend && npm run lint
+
+      - name: Build frontend
+        run: cd frontend && npm run build
+
+      - name: Synthesize CDK
+        run: cd infrastructure && npm run build && npx cdk synth
+
+  deploy-dev:
+    name: Deploy to Development
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: development
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Install dependencies
+        run: |
+          npm install
+          cd infrastructure && npm install && cd ..
+          cd frontend && npm install && cd ..
+
+      - name: Build frontend
+        run: cd frontend && npm run build
+        env:
+          VITE_API_URL: ${{ secrets.DEV_API_URL }}
+          VITE_AWS_REGION: ${{ secrets.AWS_REGION }}
+          VITE_USER_POOL_ID: ${{ secrets.DEV_USER_POOL_ID }}
+          VITE_USER_POOL_CLIENT_ID: ${{ secrets.DEV_USER_POOL_CLIENT_ID }}
+
+      - name: Deploy infrastructure
+        id: deploy
+        run: |
+          cd infrastructure
+          npx cdk deploy --all --context environment=dev --require-approval never
+
+          # Get CloudFront URL
+          CLOUDFRONT_URL=$(aws cloudformation describe-stacks \
+            --stack-name columbus-zero-frontend-dev \
+            --query "Stacks[0].Outputs[?OutputKey=='CloudFrontUrl'].OutputValue" \
+            --output text)
+
+          echo "url=$CLOUDFRONT_URL" >> $GITHUB_OUTPUT
+
+      - name: Deploy frontend to S3
+        run: |
+          BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name columbus-zero-frontend-dev \
+            --query "Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue" \
+            --output text)
+
+          aws s3 sync frontend/dist s3://$BUCKET --delete
+
+      - name: Invalidate CloudFront
+        run: |
+          DISTRIBUTION_ID=$(aws cloudformation describe-stacks \
+            --stack-name columbus-zero-frontend-dev \
+            --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" \
+            --output text)
+
+          aws cloudfront create-invalidation \
+            --distribution-id $DISTRIBUTION_ID \
+            --paths "/*"
+
+  deploy-staging:
+    name: Deploy to Staging
+    if: github.ref == 'refs/heads/staging' && github.event_name == 'push'
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Install dependencies
+        run: |
+          npm install
+          cd infrastructure && npm install && cd ..
+          cd frontend && npm install && cd ..
+
+      - name: Build frontend
+        run: cd frontend && npm run build
+        env:
+          VITE_API_URL: ${{ secrets.STAGING_API_URL }}
+          VITE_AWS_REGION: ${{ secrets.AWS_REGION }}
+          VITE_USER_POOL_ID: ${{ secrets.STAGING_USER_POOL_ID }}
+          VITE_USER_POOL_CLIENT_ID: ${{ secrets.STAGING_USER_POOL_CLIENT_ID }}
+
+      - name: Deploy infrastructure
+        id: deploy
+        run: |
+          cd infrastructure
+          npx cdk deploy --all --context environment=staging --require-approval never
+
+          CLOUDFRONT_URL=$(aws cloudformation describe-stacks \
+            --stack-name columbus-zero-frontend-staging \
+            --query "Stacks[0].Outputs[?OutputKey=='CloudFrontUrl'].OutputValue" \
+            --output text)
+
+          echo "url=$CLOUDFRONT_URL" >> $GITHUB_OUTPUT
+
+      - name: Deploy frontend to S3
+        run: |
+          BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name columbus-zero-frontend-staging \
+            --query "Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue" \
+            --output text)
+
+          aws s3 sync frontend/dist s3://$BUCKET --delete
+
+      - name: Invalidate CloudFront
+        run: |
+          DISTRIBUTION_ID=$(aws cloudformation describe-stacks \
+            --stack-name columbus-zero-frontend-staging \
+            --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" \
+            --output text)
+
+          aws cloudfront create-invalidation \
+            --distribution-id $DISTRIBUTION_ID \
+            --paths "/*"
+
+  deploy-prod:
+    name: Deploy to Production
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Install dependencies
+        run: |
+          npm install
+          cd infrastructure && npm install && cd ..
+          cd frontend && npm install && cd ..
+
+      - name: Build frontend
+        run: cd frontend && npm run build
+        env:
+          VITE_API_URL: ${{ secrets.PROD_API_URL }}
+          VITE_AWS_REGION: ${{ secrets.AWS_REGION }}
+          VITE_USER_POOL_ID: ${{ secrets.PROD_USER_POOL_ID }}
+          VITE_USER_POOL_CLIENT_ID: ${{ secrets.PROD_USER_POOL_CLIENT_ID }}
+
+      - name: Deploy infrastructure
+        id: deploy
+        run: |
+          cd infrastructure
+          npx cdk deploy --all --context environment=prod --require-approval never
+
+          CLOUDFRONT_URL=$(aws cloudformation describe-stacks \
+            --stack-name columbus-zero-frontend-prod \
+            --query "Stacks[0].Outputs[?OutputKey=='CloudFrontUrl'].OutputValue" \
+            --output text)
+
+          echo "url=$CLOUDFRONT_URL" >> $GITHUB_OUTPUT
+
+      - name: Deploy frontend to S3
+        run: |
+          BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name columbus-zero-frontend-prod \
+            --query "Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue" \
+            --output text)
+
+          aws s3 sync frontend/dist s3://$BUCKET --delete
+
+      - name: Invalidate CloudFront
+        run: |
+          DISTRIBUTION_ID=$(aws cloudformation describe-stacks \
+            --stack-name columbus-zero-frontend-prod \
+            --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" \
+            --output text)
+
+          aws cloudfront create-invalidation \
+            --distribution-id $DISTRIBUTION_ID \
+            --paths "/*"
+
+      - name: Notify deployment
+        run: |
+          echo "🚀 Production deployment completed!"
+          echo "URL: ${{ steps.deploy.outputs.url }}"

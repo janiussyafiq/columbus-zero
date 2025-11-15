@@ -1,0 +1,37 @@
+{
+  "name": "columbus-zero",
+  "version": "1.0.0",
+  "description": "AI-powered travel planning platform with AWS infrastructure",
+  "private": true,
+  "workspaces": [
+    "infrastructure",
+    "frontend"
+  ],
+  "scripts": {
+    "install:all": "npm install && cd infrastructure && npm install && cd ../frontend && npm install",
+    "build:infra": "cd infrastructure && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "build:all": "npm run build:infra && npm run build:frontend",
+    "deploy:dev": "bash scripts/deploy.sh dev",
+    "deploy:staging": "bash scripts/deploy.sh staging",
+    "deploy:prod": "bash scripts/deploy.sh prod",
+    "destroy:dev": "cd infrastructure && cdk destroy --all --profile default",
+    "test:infra": "cd infrastructure && npm test",
+    "test:frontend": "cd frontend && npm test",
+    "lint:frontend": "cd frontend && npm run lint",
+    "dev:frontend": "cd frontend && npm run dev"
+  },
+  "keywords": [
+    "aws",
+    "cdk",
+    "travel",
+    "ai",
+    "anthropic",
+    "claude"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.0"
+  }
+}
