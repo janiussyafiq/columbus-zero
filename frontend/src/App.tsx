@@ -80,7 +80,7 @@ function LoginPage() {
 function RequireAuth({ children }: { children: JSX.Element }) {
   return (
     <Authenticator>
-      {({ signOut, user }) => (user ? children : <Navigate to="/login" replace />)}
+      {({ user }) => (user ? children : <Navigate to="/login" replace />)}
     </Authenticator>
   );
 }

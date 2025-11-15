@@ -16,35 +16,15 @@ export class DataStack extends cdk.Stack {
   public readonly databaseSecret: secretsmanager.ISecret;
   public readonly sessionsTable: dynamodb.Table;
   public readonly itinerariesTable: dynamodb.Table;
-  public readonly lambdaSecurityGroup: ec2.ISecurityGroup;
 
   constructor(scope: Construct, id: string, props: DataStackProps) {
     super(scope, id, props);
 
     const { config } = props;
 
-    // VPC for the application
-    this.vpc = new ec2.Vpc(this, 'VPC', {
-      maxAzs: 2, // Use 2 Availability Zones for high availability
-      subnetConfiguration: [
-        {
-          cidrMask: 24,
-          name: 'public',
-          subnetType: ec2.SubnetType.PUBLIC,
-        },
-        {
-          cidrMask: 24,
-          name: 'private',
-          subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
-        },
-      ],
-    });
-
-    // Security Group for Lambda functions
-    this.lambdaSecurityGroup = new ec2.SecurityGroup(this, 'LambdaSecurityGroup', {
-      vpc: this.vpc,
-      description: 'Security group for Lambda functions to access RDS',
-      allowAllOutbound: true,
+    // VPC for RDS (use default VPC or create new one)
+    this.vpc = ec2.Vpc.fromLookup(this, 'VPC', {
+      isDefault: true,
     });
 
     // Database credentials secret
@@ -62,67 +42,35 @@ export class DataStack extends cdk.Stack {
       },
     });
 
-    // Database - Use regular RDS for dev (free tier eligible), Aurora for prod
-    if (config.environment === 'dev') {
-      // Regular RDS PostgreSQL instance for dev (free tier eligible)
-      const dbInstance = new rds.DatabaseInstance(this, 'Database', {
-        engine: rds.DatabaseInstanceEngine.postgres({
-          version: rds.PostgresEngineVersion.VER_15,
-        }),
-        credentials: rds.Credentials.fromSecret(this.databaseSecret),
-        databaseName: config.databaseName,
-        vpc: this.vpc,
-        vpcSubnets: {
-          subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
-        },
-        instanceType: ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MICRO),
-        allocatedStorage: 20,
-        maxAllocatedStorage: 100,
-        publiclyAccessible: false,
-        deletionProtection: false,
-        removalPolicy: cdk.RemovalPolicy.DESTROY,
-        backupRetention: cdk.Duration.days(1),
-      });
-
-      // Allow Lambda to connect
-      dbInstance.connections.allowDefaultPortFrom(this.lambdaSecurityGroup);
-
-      // Cast to IDatabaseCluster for compatibility
-      this.database = dbInstance as any;
-    } else {
-      // Aurora Serverless v2 for staging/prod
-      this.database = new rds.DatabaseCluster(this, 'Database', {
-        engine: rds.DatabaseClusterEngine.auroraPostgres({
-          version: rds.AuroraPostgresEngineVersion.VER_15_3,
-        }),
-        credentials: rds.Credentials.fromSecret(this.databaseSecret),
-        defaultDatabaseName: config.databaseName,
-        vpc: this.vpc,
-        vpcSubnets: {
-          subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
-        },
-        serverlessV2MinCapacity: config.rdsMinCapacity,
-        serverlessV2MaxCapacity: config.rdsMaxCapacity,
-        writer: rds.ClusterInstance.serverlessV2('Writer', {
-          publiclyAccessible: false,
-        }),
-        readers: [rds.ClusterInstance.serverlessV2('Reader', {
-          scaleWithWriter: true,
-          publiclyAccessible: false,
-        })],
-        backup: {
-          retention: cdk.Duration.days(7),
-          preferredWindow: '03:00-04:00',
-        },
-        storageEncrypted: true,
-        deletionProtection: true,
-        removalPolicy: cdk.RemovalPolicy.RETAIN,
-      });
-
-      // Allow Lambda to connect
-      this.database.connections.allowDefaultPortFrom(this.lambdaSecurityGroup);
-    }
-
+    // RDS Aurora Serverless v2 PostgreSQL cluster
+    this.database = new rds.DatabaseCluster(this, 'Database', {
+      engine: rds.DatabaseClusterEngine.auroraPostgres({
+        version: rds.AuroraPostgresEngineVersion.VER_15_3,
+      }),
+      credentials: rds.Credentials.fromSecret(this.databaseSecret),
+      defaultDatabaseName: config.databaseName,
+      vpc: this.vpc,
+      vpcSubnets: {
+        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+      },
+      serverlessV2MinCapacity: config.rdsMinCapacity,
+      serverlessV2MaxCapacity: config.rdsMaxCapacity,
+      writer: rds.ClusterInstance.serverlessV2('Writer'),
+      readers: config.environment === 'prod'
+        ? [rds.ClusterInstance.serverlessV2('Reader', { scaleWithWriter: true })]
+        : [],
+      backup: {
+        retention: config.environment === 'prod'
+          ? cdk.Duration.days(7)
+          : cdk.Duration.days(1),
+        preferredWindow: '03:00-04:00',
+      },
+      storageEncrypted: true,
+      deletionProtection: config.environment === 'prod',
+      removalPolicy: config.environment === 'prod'
+        ? cdk.RemovalPolicy.RETAIN
+        : cdk.RemovalPolicy.DESTROY,
+    });
 
     // DynamoDB table for sessions and real-time data
     this.sessionsTable = new dynamodb.Table(this, 'SessionsTable', {
@@ -192,10 +140,8 @@ export class DataStack extends cdk.Stack {
 
     // Outputs
     new cdk.CfnOutput(this, 'DatabaseEndpoint', {
-      value: config.environment === 'dev'
-        ? (this.database as any).instanceEndpoint.hostname
-        : (this.database as rds.DatabaseCluster).clusterEndpoint.hostname,
-      description: 'RDS endpoint',
+      value: this.database.clusterEndpoint.hostname,
+      description: 'RDS cluster endpoint',
       exportName: `${config.stackPrefix}-db-endpoint-${config.environment}`,
     });
 

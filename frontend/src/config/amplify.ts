@@ -7,9 +7,8 @@ const amplifyConfig = {
       userPoolClientId: import.meta.env.VITE_USER_POOL_CLIENT_ID || '',
       loginWith: {
         email: true,
-        username: true,
       },
-      signUpVerificationMethod: 'code',
+      signUpVerificationMethod: 'code' as const,
       userAttributes: {
         email: {
           required: true,

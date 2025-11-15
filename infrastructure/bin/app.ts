@@ -47,6 +47,8 @@ const computeStack = new ComputeStack(app, getStackName(config, 'compute'), {
   databaseSecret: dataStack.databaseSecret,
   sessionsTable: dataStack.sessionsTable,
   userPool: authStack.userPool,
+  vpc: dataStack.vpc,
+  lambdaSecurityGroup: dataStack.lambdaSecurityGroup,
 });
 
 // 4. API Stack - API Gateway

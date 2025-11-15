@@ -22,7 +22,7 @@ export class AuthStack extends cdk.Stack {
       selfSignUpEnabled: true,
       signInAliases: {
         email: true,
-        username: true,
+        username: false,
       },
       autoVerify: {
         email: true,
@@ -64,9 +64,11 @@ export class AuthStack extends cdk.Stack {
         sms: true,
         otp: true,
       },
-      advancedSecurityMode: config.environment === 'prod'
-        ? cognito.AdvancedSecurityMode.ENFORCED
-        : cognito.AdvancedSecurityMode.AUDIT,
+      // Note: Advanced Security Mode requires Cognito Plus plan
+      // Uncomment and upgrade to Plus plan if needed for production
+      // advancedSecurityMode: config.environment === 'prod'
+      //   ? cognito.AdvancedSecurityMode.ENFORCED
+      //   : cognito.AdvancedSecurityMode.AUDIT,
       deviceTracking: {
         challengeRequiredOnNewDevice: true,
         deviceOnlyRememberedOnUserPrompt: true,

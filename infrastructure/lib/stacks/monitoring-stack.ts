@@ -45,8 +45,8 @@ export class MonitoringStack extends cdk.Stack {
       title: 'API Gateway Metrics',
       left: [
         api.metricCount({ statistic: 'sum', label: 'Request Count' }),
-        api.metric4XXError({ statistic: 'sum', label: '4XX Errors' }),
-        api.metric5XXError({ statistic: 'sum', label: '5XX Errors' }),
+        api.metricClientError({ statistic: 'sum', label: '4XX Errors' }),
+        api.metricServerError({ statistic: 'sum', label: '5XX Errors' }),
       ],
       right: [
         api.metricLatency({ statistic: 'avg', label: 'Avg Latency' }),
@@ -59,7 +59,7 @@ export class MonitoringStack extends cdk.Stack {
     // API Gateway Alarms
     const apiErrorAlarm = new cloudwatch.Alarm(this, 'ApiErrorAlarm', {
       alarmName: `${config.stackPrefix}-api-errors-${config.environment}`,
-      metric: api.metric5XXError({ statistic: 'sum', period: cdk.Duration.minutes(5) }),
+      metric: api.metricServerError({ statistic: 'sum', period: cdk.Duration.minutes(5) }),
       threshold: 10,
       evaluationPeriods: 2,
       treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,

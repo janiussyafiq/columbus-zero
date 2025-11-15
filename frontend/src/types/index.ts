@@ -111,3 +111,27 @@ export interface ApiResponse<T> {
   message: string;
   data: T;
 }
+
+// Backend-specific response types
+export interface GenerateItineraryResponse {
+  itinerary_id: string;
+  itinerary: Itinerary;
+  created_at: string;
+}
+
+export interface ItineraryDetailResponse {
+  id: string;
+  user_id: string;
+  title: string;
+  destination_name: string;
+  start_date?: string;
+  end_date?: string;
+  duration_days: number;
+  budget_total: number;
+  budget_currency: string;
+  travel_style: string;
+  status: string;
+  itinerary_data: Itinerary;
+  created_at: string;
+  updated_at: string;
+}

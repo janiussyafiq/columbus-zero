@@ -47,7 +47,7 @@ export function getConfig(environment?: string): EnvironmentConfig {
 
     // Database Configuration
     databaseName: process.env.DB_NAME || 'columbus_travel',
-    databaseUsername: process.env.DB_USERNAME || 'admin',
+    databaseUsername: process.env.DB_USERNAME || 'dbadmin',
     databasePort: parseInt(process.env.DB_PORT || '5432'),
     rdsMinCapacity: parseFloat(process.env.RDS_MIN_CAPACITY || '0.5'),
     rdsMaxCapacity: parseFloat(process.env.RDS_MAX_CAPACITY || '2'),

@@ -1,11 +1,11 @@
-import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
+import axios, { AxiosInstance } from 'axios';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import type {
   ApiResponse,
   GenerateItineraryRequest,
-  Itinerary,
+  GenerateItineraryResponse,
+  ItineraryDetailResponse,
   ChatRequest,
-  ChatMessage,
   UserPreferences,
   Destination,
 } from '@/types';
@@ -54,17 +54,17 @@ class ApiService {
   }
 
   // Itinerary endpoints
-  async generateItinerary(data: GenerateItineraryRequest): Promise<ApiResponse<Itinerary>> {
+  async generateItinerary(data: GenerateItineraryRequest): Promise<ApiResponse<GenerateItineraryResponse>> {
     const response = await this.api.post('/itinerary/generate', data);
     return response.data;
   }
 
-  async getItinerary(id: string): Promise<ApiResponse<Itinerary>> {
+  async getItinerary(id: string): Promise<ApiResponse<ItineraryDetailResponse>> {
     const response = await this.api.get(`/itinerary/${id}`);
     return response.data;
   }
 
-  async updateItinerary(id: string, data: Partial<Itinerary>): Promise<ApiResponse<Itinerary>> {
+  async updateItinerary(id: string, data: Partial<ItineraryDetailResponse>): Promise<ApiResponse<{ itinerary_id: string; updated_at: string }>> {
     const response = await this.api.put(`/itinerary/${id}`, data);
     return response.data;
   }

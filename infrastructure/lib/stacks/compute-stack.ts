@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as rds from 'aws-cdk-lib/aws-rds';
+import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
@@ -15,6 +16,8 @@ interface ComputeStackProps extends cdk.StackProps {
   databaseSecret: secretsmanager.ISecret;
   sessionsTable: dynamodb.Table;
   userPool: cognito.UserPool;
+  vpc: ec2.IVpc;
+  lambdaSecurityGroup: ec2.ISecurityGroup;
 }
 
 export class ComputeStack extends cdk.Stack {
@@ -23,7 +26,7 @@ export class ComputeStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: ComputeStackProps) {
     super(scope, id, props);
 
-    const { config, database, databaseSecret, sessionsTable, userPool } = props;
+    const { config, database, databaseSecret, sessionsTable, userPool, vpc, lambdaSecurityGroup } = props;
 
     // Common Lambda environment variables
     const commonEnv = {
@@ -46,6 +49,9 @@ export class ComputeStack extends cdk.Stack {
         : logs.RetentionDays.ONE_WEEK,
       tracing: lambda.Tracing.ACTIVE,
       environment: commonEnv,
+      vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      securityGroups: [lambdaSecurityGroup],
     };
 
     // Lambda Layer for shared dependencies
@@ -151,10 +157,7 @@ export class ComputeStack extends cdk.Stack {
     Object.values(this.functions).forEach((fn) => {
       // Database access
       databaseSecret.grantRead(fn);
-      if (database.connections) {
-        database.connections.allowDefaultPortFrom(fn);
-      }
-
+      
       // DynamoDB access
       sessionsTable.grantReadWriteData(fn);
 
