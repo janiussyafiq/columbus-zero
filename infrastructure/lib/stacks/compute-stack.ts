@@ -37,6 +37,7 @@ export class ComputeStack extends cdk.Stack {
       SESSIONS_TABLE: sessionsTable.tableName,
       USER_POOL_ID: userPool.userPoolId,
       REGION: config.awsRegion,
+      CORS_ALLOWED_ORIGINS: config.corsAllowedOrigins.join(','),
     };
 
     // Common Lambda properties

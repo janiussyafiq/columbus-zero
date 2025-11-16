@@ -55,7 +55,17 @@ class ApiService {
 
   // Itinerary endpoints
   async generateItinerary(data: GenerateItineraryRequest): Promise<ApiResponse<GenerateItineraryResponse>> {
-    const response = await this.api.post('/itinerary/generate', data);
+    // Transform camelCase to snake_case for backend
+    const backendData = {
+      destination: data.destination,
+      duration_days: data.durationDays,
+      budget: data.budget,
+      budget_currency: data.budgetCurrency,
+      travel_style: data.travelStyle,
+      start_date: data.startDate,
+      preferences: data.preferences,
+    };
+    const response = await this.api.post('/itinerary/generate', backendData);
     return response.data;
   }
 

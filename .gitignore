@@ -13,7 +13,6 @@ cdk.out/
 
 # Environment variables
 .env
-.env.example
 .env.local
 .env.development.local
 .env.test.local
@@ -34,6 +33,11 @@ ENV/
 dist/
 build/
 
+# Lambda Layer Dependencies - installed packages
+backend/shared/python/*
+!backend/shared/python/utils/
+!backend/shared/python/requirements.txt
+
 # IDEs
 .idea/
 .vscode/
@@ -52,7 +56,6 @@ lerna-debug.log*
 
 # CDK
 .cdk.staging/
-cdk.context.json
 
 # Temporary files
 *.tmp

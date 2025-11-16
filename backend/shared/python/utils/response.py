@@ -2,10 +2,33 @@
 HTTP response utilities for API Gateway Lambda integrations
 """
 import json
+import os
 from typing import Any, Dict, Optional
 import logging
 
 logger = logging.getLogger()
+
+
+def get_cors_headers() -> Dict[str, str]:
+    """
+    Get CORS headers based on environment configuration
+
+    Returns:
+        Dictionary of CORS headers
+    """
+    # Get allowed origins from environment variable
+    allowed_origins = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:5173').split(',')
+
+    # For simplicity, use the first allowed origin
+    # In production, you might want to check the Origin header from the request
+    origin = allowed_origins[0].strip()
+
+    return {
+        'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Credentials': 'true',
+        'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+    }
 
 
 def create_response(
@@ -26,9 +49,10 @@ def create_response(
     """
     default_headers = {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Credentials': 'true',
     }
+
+    # Add CORS headers
+    default_headers.update(get_cors_headers())
 
     if headers:
         default_headers.update(headers)
